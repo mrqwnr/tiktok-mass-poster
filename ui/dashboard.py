@@ -1,29 +1,22 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QFrame, QScrollArea, QGridLayout
+    QFrame, QScrollArea, QGridLayout, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 class StatCard(QFrame):
-    def __init__(self, label, value, icon=""):
+    def __init__(self, label, value):
         super().__init__()
         self.setObjectName("card")
-        self.setFixedHeight(110)
+        self.setFixedHeight(100)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(6)
 
-        top = QHBoxLayout()
-        icon_lbl = QLabel(icon)
-        icon_lbl.setFont(QFont("Segoe UI", 22))
-        top.addWidget(icon_lbl)
-        top.addStretch()
-        layout.addLayout(top)
-
-        val_lbl = QLabel(str(value))
-        val_lbl.setObjectName("stat_value")
-        layout.addWidget(val_lbl)
-        self.val_lbl = val_lbl
+        self.val_lbl = QLabel(str(value))
+        self.val_lbl.setObjectName("stat_value")
+        layout.addWidget(self.val_lbl)
 
         lbl = QLabel(label)
         lbl.setObjectName("stat_label")
@@ -33,29 +26,38 @@ class StatCard(QFrame):
         self.val_lbl.setText(str(value))
 
 
-class TopAccountCard(QFrame):
+class TopAccountRow(QFrame):
     def __init__(self, rank, login, views, likes, videos):
         super().__init__()
         self.setObjectName("card")
+        self.setFixedHeight(60)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setContentsMargins(20, 0, 20, 0)
+        layout.setSpacing(16)
 
-        rank_lbl = QLabel(f"#{rank}")
-        rank_lbl.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        rank_lbl.setStyleSheet("color: #fe2c55;")
-        rank_lbl.setFixedWidth(40)
+        rank_lbl = QLabel(f"{rank}")
+        rank_lbl.setFixedWidth(24)
+        rank_lbl.setStyleSheet("font-size: 15px; font-weight: 700; color: #CCCCCC;")
         layout.addWidget(rank_lbl)
 
-        info = QVBoxLayout()
         name_lbl = QLabel(login)
-        name_lbl.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
-        info.addWidget(name_lbl)
-
-        stats_lbl = QLabel(f"👁 {views or 0}  ❤️ {likes or 0}  🎬 {videos or 0}")
-        stats_lbl.setStyleSheet("color: #888; font-size: 12px;")
-        info.addWidget(stats_lbl)
-        layout.addLayout(info)
+        name_lbl.setStyleSheet("font-size: 14px; font-weight: 600; color: #111111;")
+        layout.addWidget(name_lbl)
         layout.addStretch()
+
+        for val, lbl in [(views or 0, "views"), (likes or 0, "likes"), (videos or 0, "videos")]:
+            col = QVBoxLayout()
+            col.setSpacing(1)
+            v = QLabel(str(val))
+            v.setStyleSheet("font-size: 13px; font-weight: 600; color: #111111;")
+            v.setAlignment(Qt.AlignmentFlag.AlignRight)
+            l = QLabel(lbl)
+            l.setStyleSheet("font-size: 11px; color: #AAAAAA;")
+            l.setAlignment(Qt.AlignmentFlag.AlignRight)
+            col.addWidget(v)
+            col.addWidget(l)
+            layout.addLayout(col)
+            layout.addSpacing(12)
 
 
 class DashboardPage(QWidget):
@@ -71,24 +73,25 @@ class DashboardPage(QWidget):
 
         content = QWidget()
         self.main_layout = QVBoxLayout(content)
-        self.main_layout.setContentsMargins(30, 30, 30, 30)
-        self.main_layout.setSpacing(20)
+        self.main_layout.setContentsMargins(36, 36, 36, 36)
+        self.main_layout.setSpacing(28)
 
         # Title
-        title = QLabel("Главная")
-        title.setObjectName("title")
+        title = QLabel("Dashboard")
+        title.setObjectName("page_title")
         self.main_layout.addWidget(title)
 
-        # Stats row
+        # Stats grid
         stats_grid = QGridLayout()
-        stats_grid.setSpacing(16)
+        stats_grid.setSpacing(14)
+        stats_grid.setContentsMargins(0, 0, 0, 0)
 
-        self.stat_accounts = StatCard("Аккаунтов", "0", "👤")
-        self.stat_videos = StatCard("Видео всего", "0", "🎬")
-        self.stat_posted = StatCard("Опубликовано", "0", "✅")
-        self.stat_views = StatCard("Просмотров", "0", "👁")
-        self.stat_likes = StatCard("Лайков", "0", "❤️")
-        self.stat_failed = StatCard("Ошибок", "0", "❌")
+        self.stat_accounts = StatCard("Accounts", "0")
+        self.stat_videos = StatCard("Total videos", "0")
+        self.stat_posted = StatCard("Posted", "0")
+        self.stat_views = StatCard("Total views", "0")
+        self.stat_likes = StatCard("Total likes", "0")
+        self.stat_failed = StatCard("Failed", "0")
 
         stats_grid.addWidget(self.stat_accounts, 0, 0)
         stats_grid.addWidget(self.stat_videos, 0, 1)
@@ -100,13 +103,13 @@ class DashboardPage(QWidget):
         self.main_layout.addLayout(stats_grid)
 
         # Top accounts
-        top_title = QLabel("🏆 Топ 3 аккаунта")
-        top_title.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
-        self.main_layout.addWidget(top_title)
+        top_label = QLabel("Top accounts")
+        top_label.setObjectName("section_title")
+        self.main_layout.addWidget(top_label)
 
-        self.top_accounts_layout = QVBoxLayout()
-        self.top_accounts_layout.setSpacing(10)
-        self.main_layout.addLayout(self.top_accounts_layout)
+        self.top_layout = QVBoxLayout()
+        self.top_layout.setSpacing(8)
+        self.main_layout.addLayout(self.top_layout)
 
         self.main_layout.addStretch()
 
@@ -124,24 +127,17 @@ class DashboardPage(QWidget):
         self.stat_likes.update_value(stats.get("total_likes", 0) or 0)
         self.stat_failed.update_value(stats.get("failed_videos", 0))
 
-        # Clear top accounts
-        while self.top_accounts_layout.count():
-            item = self.top_accounts_layout.takeAt(0)
+        while self.top_layout.count():
+            item = self.top_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
         top = self.db.get_top_accounts(3)
         for i, acc in enumerate(top):
-            card = TopAccountCard(
-                i + 1,
-                acc["login"],
-                acc["total_views"],
-                acc["total_likes"],
-                acc["video_count"]
-            )
-            self.top_accounts_layout.addWidget(card)
+            row = TopAccountRow(i + 1, acc["login"], acc["total_views"], acc["total_likes"], acc["video_count"])
+            self.top_layout.addWidget(row)
 
         if not top:
-            empty = QLabel("Нет данных. Добавьте аккаунты и начните постинг.")
-            empty.setStyleSheet("color: #aaa; font-size: 13px;")
-            self.top_accounts_layout.addWidget(empty)
+            empty = QLabel("No data yet. Add accounts and start posting.")
+            empty.setStyleSheet("color: #CCCCCC; font-size: 13px;")
+            self.top_layout.addWidget(empty)
