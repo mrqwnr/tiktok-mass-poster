@@ -1,80 +1,68 @@
-import requests
+import aiohttp
 import json
-import random
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 class AIHelper:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
+    def __init__(self, db):
+        self.db = db
 
-    def _chat(self, prompt: str, max_tokens: int = 500) -> str:
-        if not self.api_key:
-            raise ValueError("DeepSeek API key not set")
+    def _get_api_key(self) -> str:
+        key = self.db.get_setting("deepseek_api_key", "")
+        if not key:
+            raise ValueError("DeepSeek API ключ не задан. Укажите его в Настройках.")
+        return key
+
+    async def _ask(self, prompt: str) -> str:
+        api_key = self._get_api_key()
+        url = "https://api.deepseek.com/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
         }
-        data = {
+        payload = {
             "model": "deepseek-chat",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens,
-            "temperature": 0.8
+            "temperature": 0.8,
+            "max_tokens": 300,
         }
-        resp = requests.post(DEEPSEEK_API_URL, headers=headers, json=data, timeout=30)
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"].strip()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise ValueError(f"DeepSeek API ошибка {resp.status}: {text[:200]}")
+                data = await resp.json()
+                return data["choices"][0]["message"]["content"].strip()
 
-    def generate_hashtags(self, niche: str, target_audience: str, count: int = 10) -> list:
-        prompt = f"""Generate {count} TikTok hashtags for:
-Niche: {niche}
-Target audience: {target_audience}
+    async def generate_caption(self, niche: str = "", audience: str = "") -> str:
+        niche_str = niche or "общая тематика"
+        audience_str = audience or "широкая аудитория"
+        prompt = (
+            f"Напиши короткое цепляющее описание для TikTok видео. "
+            f"Ниша: {niche_str}. Целевая аудитория: {audience_str}. "
+            f"Максимум 2 предложения. Только текст, без хэштегов."
+        )
+        return await self._ask(prompt)
 
-Rules:
-- Mix popular and niche hashtags
-- No spaces in hashtags
-- Return ONLY hashtags separated by spaces, nothing else
-- Include # symbol"""
-        result = self._chat(prompt, max_tokens=200)
-        tags = [t.strip() for t in result.split() if t.startswith("#")]
-        return tags[:count]
+    async def generate_hashtags(self, niche: str = "", audience: str = "", count: int = 10) -> str:
+        niche_str = niche or "общая тематика"
+        audience_str = audience or "широкая аудитория"
+        prompt = (
+            f"Дай {count} релевантных хэштегов для TikTok. "
+            f"Ниша: {niche_str}. Аудитория: {audience_str}. "
+            f"Формат: #хэштег1 #хэштег2 ... Только хэштеги, ничего лишнего."
+        )
+        return await self._ask(prompt)
 
-    def rephrase_caption(self, original_text: str) -> str:
-        prompt = f"""Rephrase this TikTok caption. Keep the same meaning but use different words. 
-Make it engaging and natural. Keep it short (under 150 chars).
-Original: {original_text}
-Return ONLY the rephrased caption, nothing else."""
-        return self._chat(prompt, max_tokens=100)
-
-    def generate_profile(self) -> dict:
-        prompt = """Generate a realistic human TikTok profile. Return JSON only:
-{
-  "username": "realistic_username_no_spaces",
-  "display_name": "Real Looking Name",
-  "bio": "Short bio under 80 chars, casual tone"
-}
-Make it look like a real person, not a bot."""
-        result = self._chat(prompt, max_tokens=150)
+    async def generate_profile(self, niche: str = "", audience: str = "") -> dict:
+        niche_str = niche or "общая тематика"
+        prompt = (
+            f"Придумай профиль TikTok аккаунта для ниши: {niche_str}. "
+            f"Верни JSON с полями: display_name (имя), bio (описание профиля до 80 символов). "
+            f"Только JSON, без пояснений."
+        )
+        raw = await self._ask(prompt)
         try:
-            start = result.find("{")
-            end = result.rfind("}") + 1
-            return json.loads(result[start:end])
+            raw = raw.strip().strip("```json").strip("```").strip()
+            return json.loads(raw)
         except Exception:
-            return {
-                "username": f"user_{random.randint(1000, 9999)}",
-                "display_name": "User",
-                "bio": "Just vibing 🎵"
-            }
-
-    def generate_post_schedule(self, posts_per_day: int, interval_min: int, interval_max: int) -> list:
-        prompt = f"""Generate a realistic TikTok posting schedule for {posts_per_day} posts per day.
-Post interval: {interval_min}-{interval_max} minutes between posts.
-Return ONLY a JSON array of times in HH:MM format, e.g. ["09:00", "13:30", "18:00"]
-Make times realistic for human behavior (not too early, not too late)."""
-        result = self._chat(prompt, max_tokens=100)
-        try:
-            start = result.find("[")
-            end = result.rfind("]") + 1
-            return json.loads(result[start:end])
-        except Exception:
-            return ["09:00", "13:00", "18:00"][:posts_per_day]
+            return {"display_name": "", "bio": raw}
