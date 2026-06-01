@@ -1,12 +1,13 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QPushButton, QFrame, QLabel, QStackedWidget, QSpacerItem, QSizePolicy
+    QPushButton, QFrame, QLabel, QStackedWidget
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QFontDatabase
+from PyQt6.QtGui import QFontDatabase
 from ui.dashboard import DashboardPage
 from ui.accounts_page import AccountsPage
 from ui.settings_page import SettingsPage
+from ui.posting_page import PostingPage
 from ui.styles import MAIN_STYLE
 import os
 
@@ -16,9 +17,8 @@ class MainWindow(QMainWindow):
         self.db = db
         self.setWindowTitle("TikTok Mass Poster")
         self.setMinimumSize(1100, 700)
-        self.resize(1280, 800)
+        self.resize(1300, 820)
 
-        # Load DM Sans font if available
         font_path = os.path.join(os.path.dirname(__file__), "..", "assets", "DMSans.ttf")
         if os.path.exists(font_path):
             QFontDatabase.addApplicationFont(font_path)
@@ -29,70 +29,65 @@ class MainWindow(QMainWindow):
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
-        layout = QHBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        root = QHBoxLayout(central)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # Sidebar
+        # Сайдбар
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(210)
-        sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(0, 28, 0, 24)
-        sidebar_layout.setSpacing(2)
+        sidebar.setFixedWidth(220)
+        sb = QVBoxLayout(sidebar)
+        sb.setContentsMargins(0, 32, 0, 28)
+        sb.setSpacing(2)
 
-        # Logo
         logo = QLabel("Mass Poster")
         logo.setObjectName("logo")
-        logo.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        logo.setContentsMargins(20, 0, 0, 0)
-        sidebar_layout.addWidget(logo)
+        logo.setContentsMargins(22, 0, 0, 0)
+        sb.addWidget(logo)
+        sb.addSpacing(28)
 
-        sidebar_layout.addSpacing(24)
-
-        # Nav
         self.nav_buttons = []
         nav_items = [
-            ("Dashboard", 0),
-            ("Accounts", 1),
-            ("Settings", 2),
+            ("Главная",    0),
+            ("Аккаунты",   1),
+            ("Постинг",    2),
+            ("Настройки",  3),
         ]
         for label, idx in nav_items:
             btn = QPushButton(label)
             btn.setObjectName("nav_btn")
             btn.setCheckable(True)
-            btn.setFixedHeight(38)
-            btn.clicked.connect(lambda checked, i=idx: self._switch_page(i))
-            sidebar_layout.addWidget(btn)
+            btn.setFixedHeight(42)
+            btn.clicked.connect(lambda _, i=idx: self._switch(i))
+            sb.addWidget(btn)
             self.nav_buttons.append(btn)
 
-        sidebar_layout.addStretch()
-
+        sb.addStretch()
         ver = QLabel("v0.1.0")
         ver.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        ver.setStyleSheet("color: #CCCCCC; font-size: 11px;")
-        sidebar_layout.addWidget(ver)
+        ver.setStyleSheet("color: #CCCCCC; font-size: 11px; font-weight: 500;")
+        sb.addWidget(ver)
 
-        layout.addWidget(sidebar)
+        root.addWidget(sidebar)
 
-        # Pages
+        # Страницы
         self.stack = QStackedWidget()
-        self.dashboard = DashboardPage(self.db)
-        self.accounts_page = AccountsPage(self.db)
-        self.settings_page = SettingsPage(self.db)
+        self.dashboard   = DashboardPage(self.db)
+        self.accounts_pg = AccountsPage(self.db)
+        self.posting_pg  = PostingPage(self.db)
+        self.settings_pg = SettingsPage(self.db)
 
-        self.stack.addWidget(self.dashboard)
-        self.stack.addWidget(self.accounts_page)
-        self.stack.addWidget(self.settings_page)
+        for pg in [self.dashboard, self.accounts_pg, self.posting_pg, self.settings_pg]:
+            self.stack.addWidget(pg)
 
-        layout.addWidget(self.stack)
-        self._switch_page(0)
+        root.addWidget(self.stack)
+        self._switch(0)
 
-    def _switch_page(self, index):
+    def _switch(self, index):
         self.stack.setCurrentIndex(index)
         for i, btn in enumerate(self.nav_buttons):
             btn.setChecked(i == index)
-        if index == 0:
-            self.dashboard.refresh()
-        elif index == 1:
-            self.accounts_page.refresh()
+        if index == 0: self.dashboard.refresh()
+        if index == 1: self.accounts_pg.refresh()
+        if index == 2: self.posting_pg.refresh()
